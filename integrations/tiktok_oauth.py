@@ -290,12 +290,21 @@ h1{{color:#fff;}} a{{color:#69b4ff;}} p{{color:#888;}}</style></head>
     return web.Response(text=html, content_type="text/html")
 
 
+async def handle_tiktok_verification(request: web.Request) -> web.Response:
+    """TikTok domain verification file."""
+    return web.Response(
+        text="tiktok-developers-site-verification=vrBOhia3zQrlJxVYL5jXjhgxFLhabWFp",
+        content_type="text/plain",
+    )
+
+
 def create_web_app() -> web.Application:
     from integrations.gmail_oauth      import handle_gmail_auth, handle_gmail_callback
     from integrations.instagram_oauth  import (handle_instagram_auth, handle_instagram_callback,
                                                handle_data_deletion, handle_deletion_status)
     from dashboard import handle_dashboard, handle_api_status
     app = web.Application()
+    app.router.add_get("/tiktok-developers-site-verification.txt", handle_tiktok_verification)
     app.router.add_get("/",                    handle_dashboard)
     app.router.add_get("/status",              handle_index)
     app.router.add_get("/api/status",          handle_api_status)
