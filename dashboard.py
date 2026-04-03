@@ -58,7 +58,7 @@ def _integration_status() -> dict:
     return {
         "twitter":   {"label": "Twitter / X",  "handle": "@justin_mafie",        "icon": "𝕏",  "ok": bool(env.get("TWITTER_API_KEY"))},
         "github":    {"label": "GitHub",        "handle": "creova-gif · 8 repos", "icon": "🐙", "ok": bool(env.get("GITHUB_TOKEN"))},
-        "instagram": {"label": "Instagram",     "handle": "4 accounts",           "icon": "📸", "ok": bool(env.get("INSTAGRAM_ACCESS_TOKEN"))},
+        "instagram": {"label": "Instagram",     "handle": "4 accounts",           "icon": "📸", "ok": os.path.exists("config/instagram_token.json")},
         "linkedin":  {"label": "LinkedIn",      "handle": "Justin + CREOVA",      "icon": "💼", "ok": bool(env.get("LINKEDIN_ACCESS_TOKEN"))},
         "snapchat":  {"label": "Snapchat",      "handle": "jay-mafie",            "icon": "👻", "ok": bool(env.get("SNAPCHAT_ACCESS_TOKEN"))},
         "tiktok":    {"label": "TikTok",        "handle": "@creovamusic",         "icon": "🎵", "ok": bool(env.get("TIKTOK_ACCESS_TOKEN"))},
