@@ -129,15 +129,15 @@ async def handle_gmail_callback(request: web.Request) -> web.Response:
     expires_in    = result.get("expires_in", 3600)
     scope         = result.get("scope", "")
 
-    # Fetch email address to confirm which account was connected
+    # Fetch email address via Gmail profile endpoint (works with gmail scopes, no userinfo scope needed)
     email = ""
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            "https://www.googleapis.com/oauth2/v1/userinfo",
+            "https://gmail.googleapis.com/gmail/v1/users/me/profile",
             headers={"Authorization": f"Bearer {access_token}"},
         ) as r:
             profile = await r.json()
-            email = profile.get("email", "unknown")
+            email = profile.get("emailAddress", "unknown")
 
     # Save token file in google-auth format
     token_obj = {
