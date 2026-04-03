@@ -61,7 +61,7 @@ TIKTOK_CLIENT_KEY = " ***REMOVED***"
 TIKTOK_CLIENT_SECRET = "***REMOVED***"
 personal_gmail_address = "ayoubjustin2@gmail.com"
 business_gmail_account = "creativeinnovationspace@gmail.com"
-INSTAGRAM_APP_ID = "1644016523540326"
+INSTAGRAM_APP_ID = "***REMOVED***"
 INSTAGRAM_APP_SECRET = "***REMOVED***"
 
 [[ports]]
