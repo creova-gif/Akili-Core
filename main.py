@@ -32,6 +32,21 @@ logging.basicConfig(
 )
 log = logging.getLogger("AKILI-CORE")
 
+
+class _ConflictFilter(logging.Filter):
+    """Suppress noisy 409 Conflict errors from simultaneous dev+prod polling.
+    The bot still works — the conflict is expected when both environments run."""
+    def filter(self, record):
+        msg = record.getMessage()
+        return (
+            "Conflict: terminated by other getUpdates" not in msg
+            and "terminated by other getUpdates" not in msg
+        )
+
+
+logging.getLogger("telegram.ext.Updater").addFilter(_ConflictFilter())
+logging.getLogger("telegram.ext.Application").addFilter(_ConflictFilter())
+
 # ── Config ────────────────────────────────────────────────────
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 ANTHROPIC_KEY  = os.environ.get("ANTHROPIC_API_KEY")
