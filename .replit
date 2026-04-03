@@ -39,3 +39,10 @@ args = "python main.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[userenv]
+
+[userenv.shared]
+TELEGRAM_TOKEN = "***REMOVED***"
+ANTHROPIC_API_KEY = "REDACTED-ROTATED-KEY"
+JUSTIN_CHAT_ID = "1720027121"

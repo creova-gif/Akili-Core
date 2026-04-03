@@ -259,11 +259,18 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    asyncio.create_task(akili.heartbeat())
-    asyncio.create_task(akili.morning_brief(app))
-
     log.info("AKILI CORE running — Telegram bot polling")
-    await app.run_polling(drop_pending_updates=True)
+
+    async with app:
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+
+        asyncio.create_task(akili.heartbeat())
+        asyncio.create_task(akili.morning_brief(app))
+
+        # Keep running until interrupted
+        stop = asyncio.Event()
+        await stop.wait()
 
 
 if __name__ == "__main__":
