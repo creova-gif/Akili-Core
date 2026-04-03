@@ -121,11 +121,18 @@ EMAIL_ACCOUNTS = {
 GITHUB_CONFIG = {
     "org": "creova-gif",
     "token": os.environ.get("GITHUB_TOKEN", ""),
+    # Active repos in the creova-gif account (8 confirmed live)
     "repos": [
-        "GoPay", "KayaYourPropertyAI", "Darsme", "MentalPath",
-        "QuickBookSample", "AIHealthSupport", "GridOS", "KilimoAI",
-        "BudgetEaseApp", "HealthFitness", "RecommendedPeptides",
-        "SEEN", "WazaWealth", "Mskniagara",
+        "Gopay",
+        "KayaYourpropertyai",
+        "Darsme",
+        "Mentalpath",
+        "Aihealthsupport",
+        "GridOs",
+        "Kilimoai",
+        "Budgeteaseapp",
+        # Repos to be created: QuickBookSample, HealthFitness, RecommendedPeptides,
+        #                       SEEN, WazaWealth, Mskniagara
     ],
 }
 

@@ -133,8 +133,9 @@ class ShieldAgent:
         try:
             headers = {"Authorization": f"token {self.github_token}"}
             async with aiohttp.ClientSession() as session:
+                # creova-gif is a user account, not an org — use /users/ endpoint
                 async with session.get(
-                    f"https://api.github.com/orgs/{GITHUB_ORG}",
+                    f"https://api.github.com/users/{GITHUB_ORG}",
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as r:
