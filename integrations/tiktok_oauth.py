@@ -291,9 +291,13 @@ h1{{color:#fff;}} a{{color:#69b4ff;}} p{{color:#888;}}</style></head>
 
 
 async def handle_tiktok_verification(request: web.Request) -> web.Response:
-    """TikTok domain verification file."""
+    """TikTok domain verification file — token read live from env var, no redeploy needed."""
+    token = os.environ.get(
+        "TIKTOK_VERIFY_TOKEN",
+        "ZOEgJ9JW9DI1DsSJngcQTHQLHJcMe7Ob"
+    )
     return web.Response(
-        text="tiktok-developers-site-verification=ZOEgJ9JW9DI1DsSJngcQTHQLHJcMe7Ob",
+        text=f"tiktok-developers-site-verification={token}",
         content_type="text/plain",
     )
 
