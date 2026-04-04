@@ -63,6 +63,8 @@ personal_gmail_address = "ayoubjustin2@gmail.com"
 business_gmail_account = "creativeinnovationspace@gmail.com"
 INSTAGRAM_APP_ID = "***REMOVED***"
 INSTAGRAM_APP_SECRET = "***REMOVED***"
+OPENAI_API_KEY = "***REMOVED***"
+RESEND_API_KEY = "***REMOVED***"
 
 [[ports]]
 localPort = 8080

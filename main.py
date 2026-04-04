@@ -28,6 +28,9 @@ from scheduler.pulse_scheduler    import PulseScheduler
 from scheduler.reach_autoresponder import ReachAutoResponder
 from scheduler.intel_live          import IntelLiveBrief
 
+# Phase 5 — Lead engine
+from integrations.intel_lead_engine import IntelLeadEngine
+
 # ── Logging ──────────────────────────────────────────────────
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
@@ -167,6 +170,9 @@ class AkiliCore:
         self.responder  = None
         self.live_intel = None
 
+        # Phase 5
+        self.lead_engine = None
+
         log.info("AKILI CORE initialized — all 5 agents + integration hub loaded")
 
     def init_phase3(self, telegram_app):
@@ -177,7 +183,8 @@ class AkiliCore:
         gmail_client = getattr(getattr(self.hub, "gmail", None), "_client", None) \
                        or getattr(self.hub, "gmail", None)
         self.responder = ReachAutoResponder(telegram_app, gmail_client)
-        log.info("Phase 3 modules initialized — PULSE Scheduler · REACH AutoResponder · INTEL LiveBrief")
+        self.lead_engine = IntelLeadEngine(telegram_app, self.memory)
+        log.info("Phase 3+5 modules initialized — PULSE Scheduler · REACH AutoResponder · INTEL LiveBrief · Lead Engine")
 
     async def route_command(self, text: str, chat_id: str) -> str:
         """Routes Justin's commands to the right agent."""
@@ -214,8 +221,36 @@ class AkiliCore:
 
         # ── Phase 3: VC tracker ───────────────────────────────
         if "vc tracker" in text_lower or ("gopay" in text_lower and "vc" in text_lower):
-            if self.live_intel:
+            if self.lead_engine:
+                # Detect product name after "vc tracker"
+                prod = "GoPay"
+                for p in ["kaya", "mentalpath", "kilimo", "gridos", "waza", "budgetease"]:
+                    if p in text_lower:
+                        prod = p.capitalize()
+                        break
+                return await self.lead_engine.vc_tracker(prod)
+            elif self.live_intel:
                 return await self.live_intel.live_vc_tracker()
+
+        # ── Phase 5: Lead generation ──────────────────────────
+        if any(w in text_lower for w in ["generate leads", "find leads", "lead gen", "find clients"]):
+            service = "tech development"
+            market  = "Canada"
+            if "africa" in text_lower or "east africa" in text_lower or "kenya" in text_lower or "tanzania" in text_lower:
+                market = "East Africa"
+            if "brand" in text_lower:
+                service = "branding"
+            elif "social" in text_lower:
+                service = "social media"
+            if self.lead_engine:
+                return await self.lead_engine.generate_creova_leads(service, market)
+
+        # ── Phase 5: Outreach pitch ───────────────────────────
+        if text_lower.startswith("outreach"):
+            parts   = text.split(" ", 2)
+            company = parts[1] if len(parts) > 1 else "a company"
+            context = parts[2] if len(parts) > 2 else ""
+            return await self.intel.handle(f"Generate a personalized outreach pitch from Justin Mafie / CREOVA to {company}. Context: {context}")
 
         # ── Phase 3: Competitor monitor ───────────────────────
         if text_lower.startswith("competitor"):
@@ -409,26 +444,31 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id) != str(JUSTIN_CHAT_ID):
         return
     await update.message.reply_text(
-        "⚡ <b>AKILI OS — Phase 3 Online</b>\n"
+        "⚡ <b>AKILI OS — Phase 5 Active</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🟢 <b>5 Agents Active</b>\n"
-        "🛡 <b>SHIELD</b> — Security + GitHub\n"
-        "📡 <b>PULSE</b> — Social Media + Auto-Scheduler\n"
-        "📨 <b>REACH</b> — Email + DMs + Repurposing\n"
-        "🔍 <b>INTEL</b> — Research + Live Briefs + VC Tracker\n"
-        "🔊 <b>AMPLIFY</b> — Music Streams + Growth\n\n"
+        "🟢 <b>5 Agents + Lead Engine</b>\n"
+        "🛡 <b>SHIELD</b> — Security · GitHub · System Health\n"
+        "📡 <b>PULSE</b> — Social · Carousel · A/B · Hashtags\n"
+        "📨 <b>REACH</b> — Email · DMs · Repurposing\n"
+        "🔍 <b>INTEL</b> — Research · VC Tracker · Leads\n"
+        "🔊 <b>AMPLIFY</b> — Music · Streams · Campaigns\n\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "📋 <b>Commands</b>\n"
+        "📋 <b>Key Commands</b>\n"
         "▸ <code>POST/EDIT/SKIP [id]</code> — approve posts\n"
         "▸ <code>/pending</code> — posts awaiting approval\n"
         "▸ <code>research [topic]</code> — live web search\n"
-        "▸ <code>vc tracker</code> — live GoPay investor intel\n"
-        "▸ <code>competitor [product]</code> — competitor news\n"
-        "▸ <code>draft reply [context]</code> — draft email\n"
-        "▸ <code>repurpose [content]</code> — all 5 platforms\n"
+        "▸ <code>vc tracker [product]</code> — investor intel\n"
+        "▸ <code>find leads [service] [market]</code> — lead gen\n"
+        "▸ <code>outreach [company]</code> — personalized pitch\n"
+        "▸ <code>carousel [topic]</code> — 7-slide IG carousel\n"
+        "▸ <code>hashtags tech/music/personal</code> — tag sets\n"
+        "▸ <code>my repos</code> — all 8 GitHub repos\n"
+        "▸ <code>[repo name]</code> — deep dive any repo\n"
+        "▸ <code>competitor [product]</code> — competitor intel\n"
         "▸ <code>health check</code> — all platform status\n"
-        "▸ <code>snapchat plan</code> — today's content\n\n"
+        "▸ <code>snapchat plan</code> — today's Snap content\n\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Deployed on Replit · St. Catharines, ON · creova.one</i>\n"
         "Send me anything, Justin.",
         parse_mode="HTML"
     )
