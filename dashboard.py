@@ -1,6 +1,6 @@
 # ============================================================
-# AKILI DASHBOARD — Mission Control
-# New OS-style UI with sidebar, agent modals, live feed
+# AKILI DASHBOARD — World-Class Mission Control
+# Real-time data · Live activity · OS-grade UX
 # ============================================================
 
 import os
@@ -22,7 +22,7 @@ def _streak_data() -> dict:
         return {"streak": 0, "last_posted": "—", "total_days": 0}
 
 
-def _recent_activity(n: int = 12) -> list[dict]:
+def _recent_activity(n: int = 20) -> list[dict]:
     entries = []
     try:
         with open("logs/akili.log") as f:
@@ -34,19 +34,19 @@ def _recent_activity(n: int = 12) -> list[dict]:
                 if m:
                     ts, level, source, msg = m.groups()
                     source = source.strip()
-                    msg = msg.strip()
-                    if "terminated by other getUpdates" in msg:
+                    msg    = msg.strip()
+                    if any(x in msg for x in ["terminated by other getUpdates", "HTTP Request", "getUpdates", "file_cache"]):
                         continue
-                    if "httpx" in source:
+                    if "httpx" in source.lower():
                         continue
                     if "HEARTBEAT" in msg and "OK" in msg:
                         continue
                     entries.append({
-                        "ts": ts[11:16],
-                        "date": ts[:10],
-                        "level": level,
+                        "ts":     ts[11:16],
+                        "date":   ts[:10],
+                        "level":  level,
                         "source": source,
-                        "msg": msg[:90] + ("…" if len(msg) > 90 else ""),
+                        "msg":    msg[:100] + ("…" if len(msg) > 100 else ""),
                     })
     except Exception:
         pass
@@ -56,14 +56,15 @@ def _recent_activity(n: int = 12) -> list[dict]:
 def _integration_status() -> dict:
     env = os.environ
     return {
-        "twitter":   {"label": "Twitter / X",  "handle": "@justin_mafie",        "icon": "𝕏",  "ok": bool(env.get("TWITTER_API_KEY"))},
-        "github":    {"label": "GitHub",        "handle": "creova-gif · 8 repos", "icon": "🐙", "ok": bool(env.get("GITHUB_TOKEN"))},
-        "instagram": {"label": "Instagram",     "handle": "4 accounts",           "icon": "📸", "ok": os.path.exists("config/instagram_token.json")},
-        "linkedin":  {"label": "LinkedIn",      "handle": "Justin + CREOVA",      "icon": "💼", "ok": bool(env.get("LINKEDIN_ACCESS_TOKEN"))},
-        "snapchat":  {"label": "Snapchat",      "handle": "jay-mafie",            "icon": "👻", "ok": bool(env.get("SNAPCHAT_ACCESS_TOKEN"))},
-        "tiktok":    {"label": "TikTok",        "handle": "@creovamusic",         "icon": "🎵", "ok": bool(env.get("TIKTOK_ACCESS_TOKEN"))},
-        "facebook":  {"label": "Facebook",      "handle": "Justin + CREOVA Biz",  "icon": "📘", "ok": bool(env.get("FACEBOOK_ACCESS_TOKEN"))},
-        "gmail":     {"label": "Gmail",         "handle": "Personal + Business",  "icon": "📧", "ok": os.path.exists("config/gmail_business_token.json")},
+        "twitter":   {"label": "Twitter / X",  "handle": "@justin_mafie",        "icon": "𝕏",   "ok": bool(env.get("TWITTER_API_KEY"))},
+        "github":    {"label": "GitHub",        "handle": "creova-gif · 8 repos", "icon": "⬡",   "ok": bool(env.get("GITHUB_TOKEN"))},
+        "instagram": {"label": "Instagram",     "handle": "4 accounts",           "icon": "◈",   "ok": os.path.exists("config/instagram_token.json")},
+        "linkedin":  {"label": "LinkedIn",      "handle": "Justin + CREOVA",      "icon": "▣",   "ok": bool(env.get("LINKEDIN_ACCESS_TOKEN"))},
+        "snapchat":  {"label": "Snapchat",      "handle": "jay-mafie",            "icon": "◎",   "ok": bool(env.get("SNAPCHAT_ACCESS_TOKEN"))},
+        "tiktok":    {"label": "TikTok",        "handle": "@creovamusic",         "icon": "◈",   "ok": bool(env.get("TIKTOK_ACCESS_TOKEN"))},
+        "facebook":  {"label": "Facebook",      "handle": "Justin + CREOVA Biz",  "icon": "◫",   "ok": bool(env.get("FACEBOOK_ACCESS_TOKEN"))},
+        "gmail":     {"label": "Gmail",         "handle": "Personal + Business",  "icon": "✉",   "ok": os.path.exists("config/gmail_business_token.json")},
+        "openai":    {"label": "OpenAI / DALL·E","handle": "Image generation",    "icon": "◬",   "ok": bool(env.get("OPENAI_API_KEY"))},
     }
 
 
@@ -72,34 +73,8 @@ def _github_repos() -> list[str]:
             "Aihealthsupport", "GridOs", "Kilimoai", "Budgeteaseapp"]
 
 
-# ── API endpoint ─────────────────────────────────────────────
-
-async def handle_api_status(request: web.Request) -> web.Response:
-    streak = _streak_data()
-    integrations = _integration_status()
-    activity = _recent_activity(15)
-    connected = sum(1 for v in integrations.values() if v["ok"])
-
-    payload = {
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
-        "uptime_since": _uptime(),
-        "agents": {
-            "SHIELD":  {"desc": "Security & GitHub monitor", "status": "active"},
-            "PULSE":   {"desc": "Social media publisher",    "status": "active"},
-            "REACH":   {"desc": "Email & outreach",          "status": "active"},
-            "INTEL":   {"desc": "Market & trend analysis",   "status": "active"},
-            "AMPLIFY": {"desc": "Growth & engagement",       "status": "active"},
-        },
-        "integrations": integrations,
-        "integrations_connected": connected,
-        "snapchat_streak": streak,
-        "github_repos": _github_repos(),
-        "activity": activity,
-    }
-    return web.json_response(payload)
-
-
 _start_time = datetime.utcnow()
+
 def _uptime() -> str:
     delta = datetime.utcnow() - _start_time
     h, rem = divmod(int(delta.total_seconds()), 3600)
@@ -107,10 +82,36 @@ def _uptime() -> str:
     return f"{h}h {m}m"
 
 
-# ── Main dashboard page ───────────────────────────────────────
+# ── API endpoint ─────────────────────────────────────────────
+
+async def handle_api_status(request: web.Request) -> web.Response:
+    streak       = _streak_data()
+    integrations = _integration_status()
+    activity     = _recent_activity(20)
+    connected    = sum(1 for v in integrations.values() if v["ok"])
+    payload = {
+        "timestamp":              datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        "uptime":                 _uptime(),
+        "agents": {
+            "SHIELD":  {"desc": "Security & GitHub monitor",  "status": "active"},
+            "PULSE":   {"desc": "Social media publisher",     "status": "active"},
+            "REACH":   {"desc": "Email & outreach",           "status": "active"},
+            "INTEL":   {"desc": "Market & trend analysis",    "status": "active"},
+            "AMPLIFY": {"desc": "Growth & engagement",        "status": "active"},
+        },
+        "integrations":           integrations,
+        "integrations_connected": connected,
+        "integrations_total":     len(integrations),
+        "snapchat_streak":        streak,
+        "github_repos":           _github_repos(),
+        "activity":               activity,
+    }
+    return web.json_response(payload)
+
+
+# ── Main dashboard ─────────────────────────────────────────────
 
 async def handle_dashboard(request: web.Request) -> web.Response:
-    domain = os.environ.get("REPLIT_DEV_DOMAIN", "localhost:8080")
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,669 +119,924 @@ async def handle_dashboard(request: web.Request) -> web.Response:
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="tiktok-developers-site-verification" content="ZOEgJ9JW9DI1DsSJngcQTHQLHJcMe7Ob"/>
 <title>AKILI — Command Center</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
-:root {
-  --bg:      #080A0F;
-  --bg2:     #0D1018;
-  --bg3:     #131720;
-  --border:  rgba(255,255,255,0.07);
-  --border2: rgba(255,255,255,0.13);
-  --text:    #F0EDE8;
-  --muted:   #6B7280;
+/* ── Reset & Variables ─────────────────────────────────── */
+:root{
+  --bg:      #07090E;
+  --bg2:     #0C0F19;
+  --bg3:     #111520;
+  --bg4:     #161B28;
+  --border:  rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.11);
+  --border3: rgba(255,255,255,0.18);
+  --text:    #EEE9E0;
+  --text2:   #B8B0A4;
+  --muted:   #52596B;
   --accent:  #E8C547;
+  --accent-dim: rgba(232,197,71,0.08);
   --accent2: #4ECDC4;
   --accent3: #FF6B6B;
   --green:   #22C55E;
+  --green-dim: rgba(34,197,94,0.1);
   --orange:  #F97316;
   --purple:  #A78BFA;
+  --red:     #EF4444;
+  --r:       16px;
+  --r2:      12px;
+  --r3:      8px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
-.mono{font-family:'JetBrains Mono',monospace}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Syne',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
 
+/* ── Noise grain ─────────────────────────────────────────── */
 body::before{
-  content:'';position:fixed;inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events:none;z-index:0;opacity:0.4;
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  opacity:.025;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-.shell{display:grid;grid-template-columns:72px 1fr;min-height:100vh;position:relative;z-index:1}
+/* ── Layout ──────────────────────────────────────────────── */
+.shell{
+  display:grid;
+  grid-template-columns:64px 1fr;
+  height:100vh;overflow:hidden;
+}
 
-/* Sidebar */
+/* ── Sidebar ─────────────────────────────────────────────── */
 .sidebar{
-  background:var(--bg2);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;align-items:center;padding:24px 0;gap:8px;
-  position:sticky;top:0;height:100vh;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:20px 0 24px;gap:6px;
+  position:relative;z-index:10;
 }
-.sidebar-logo{
-  width:40px;height:40px;border-radius:10px;
-  background:linear-gradient(135deg,var(--accent),#F59E0B);
+.logo{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,#E8C547 0%,#F0A030 100%);
   display:flex;align-items:center;justify-content:center;
-  font-size:18px;font-weight:800;color:#000;margin-bottom:16px;letter-spacing:-1px;
+  font-size:15px;font-weight:800;color:#000;
+  margin-bottom:20px;letter-spacing:-.5px;
+  box-shadow:0 0 24px rgba(232,197,71,.25);
+  flex-shrink:0;
 }
-.nav-btn{
-  width:44px;height:44px;border-radius:10px;border:none;background:transparent;
-  color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;
-  font-size:18px;transition:all 0.15s;position:relative;
+.nav-icon{
+  width:40px;height:40px;border-radius:10px;border:none;background:transparent;
+  color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;transition:all .18s;position:relative;
+  flex-shrink:0;
 }
-.nav-btn:hover{background:var(--bg3);color:var(--text)}
-.nav-btn.active{background:rgba(232,197,71,0.12);color:var(--accent)}
-.nav-btn.active::before{
-  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:3px;height:20px;background:var(--accent);border-radius:0 3px 3px 0;
+.nav-icon:hover{background:var(--bg3);color:var(--text2)}
+.nav-icon.on{background:var(--accent-dim);color:var(--accent)}
+.nav-icon.on::before{
+  content:'';position:absolute;left:-1px;top:50%;transform:translateY(-50%);
+  width:3px;height:18px;background:var(--accent);
+  border-radius:0 3px 3px 0;
 }
-.sidebar-bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:8px}
-.live-dot{
-  width:8px;height:8px;border-radius:50%;background:var(--green);
-  box-shadow:0 0 8px var(--green);animation:pulse-dot 2s infinite;
+.sidebar-bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px}
+.live-pulse{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 0 0 rgba(34,197,94,.5);
+  animation:live-ring 2s infinite;
 }
-@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.85)}}
+@keyframes live-ring{
+  0%  {box-shadow:0 0 0 0 rgba(34,197,94,.5)}
+  70% {box-shadow:0 0 0 8px rgba(34,197,94,0)}
+  100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}
+}
+.uptime-badge{
+  writing-mode:vertical-rl;text-orientation:mixed;
+  font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;
+  transform:rotate(180deg);letter-spacing:.05em;
+}
 
-/* Main */
-.main{padding:32px;display:flex;flex-direction:column;gap:28px;overflow-y:auto}
+/* ── Main panel ──────────────────────────────────────────── */
+.main{
+  display:flex;flex-direction:column;
+  height:100vh;overflow:hidden;
+}
 
-/* Top bar */
-.topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.topbar-left h1{font-size:28px;font-weight:800;letter-spacing:-0.5px}
-.topbar-left h1 span{color:var(--accent)}
-.topbar-sub{font-size:12px;color:var(--muted);margin-top:3px;font-family:'JetBrains Mono',monospace}
-.topbar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.status-chip{
-  display:flex;align-items:center;gap:6px;padding:6px 12px;
-  border:1px solid var(--border2);border-radius:20px;font-size:11px;color:var(--text);
-  font-family:'JetBrains Mono',monospace;
+/* ── Header ──────────────────────────────────────────────── */
+.header{
+  padding:20px 28px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-shrink:0;
+  background:linear-gradient(180deg,rgba(12,15,25,.95) 0%,rgba(12,15,25,.7) 100%);
+  backdrop-filter:blur(20px);
 }
-.status-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-dot 2s infinite}
-.cmd-pill{
-  padding:8px 16px;background:var(--accent);color:#000;border:none;
-  border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;
-  font-family:'Syne',sans-serif;letter-spacing:0.02em;transition:all 0.15s;
+.header-left{}
+.greeting{
+  font-size:22px;font-weight:800;letter-spacing:-.4px;
+  display:flex;align-items:center;gap:8px;
 }
-.cmd-pill:hover{background:#F0CF4A;transform:translateY(-1px)}
+.greeting .name{color:var(--accent)}
+.header-meta{
+  font-size:11px;color:var(--muted);margin-top:3px;
+  font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:8px;
+}
+.header-meta .sep{opacity:.3}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;border:1px solid var(--border2);border-radius:20px;
+  font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text2);
+  white-space:nowrap;
+}
+.chip .dot{width:5px;height:5px;border-radius:50%;background:var(--green);
+  animation:live-ring 2s infinite}
+.run-btn{
+  padding:7px 16px;background:var(--accent);color:#000;border:none;
+  border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;
+  font-family:'Syne',sans-serif;letter-spacing:.02em;transition:all .15s;
+  white-space:nowrap;
+}
+.run-btn:hover{background:#F0CF4A;transform:translateY(-1px);
+  box-shadow:0 4px 16px rgba(232,197,71,.3)}
 
-/* Metrics */
-.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-@media(max-width:1100px){.metrics{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}}
-.metric{
-  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
-  padding:18px 20px;position:relative;overflow:hidden;transition:border-color 0.2s;
-}
-.metric:hover{border-color:var(--border2)}
-.metric::after{
-  content:'';position:absolute;top:0;right:0;width:60px;height:60px;
-  border-radius:0 16px 0 60px;opacity:0.06;
-}
-.metric.gold::after{background:var(--accent)}
-.metric.teal::after{background:var(--accent2)}
-.metric.red::after{background:var(--accent3)}
-.metric.green::after{background:var(--green)}
-.metric.purple::after{background:var(--purple)}
-.metric-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;font-family:'JetBrains Mono',monospace}
-.metric-val{font-size:26px;font-weight:800;letter-spacing:-1px}
-.metric-val.gold{color:var(--accent)}
-.metric-val.teal{color:var(--accent2)}
-.metric-val.red{color:var(--accent3)}
-.metric-val.green{color:var(--green)}
-.metric-val.purple{color:var(--purple)}
-.metric-delta{font-size:11px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace}
+/* ── Scrollable body ─────────────────────────────────────── */
+.body{flex:1;overflow-y:auto;padding:20px 28px 28px;display:flex;flex-direction:column;gap:18px}
+.body::-webkit-scrollbar{width:3px}
+.body::-webkit-scrollbar-track{background:transparent}
+.body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-/* Section title */
-.section-title{font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
-
-/* Agents */
-.agents{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-@media(max-width:1100px){.agents{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:700px){.agents{grid-template-columns:1fr 1fr}}
-.agent-card{
-  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
-  padding:20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;
+/* ── Section header ──────────────────────────────────────── */
+.sec-hd{
+  font-size:10px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;
 }
-.agent-card:hover{border-color:var(--border2);transform:translateY(-2px)}
-.agent-card.selected{border-color:var(--accent);background:rgba(232,197,71,0.04)}
-.agent-glyph{
-  width:40px;height:40px;border-radius:10px;display:flex;align-items:center;
-  justify-content:center;font-size:18px;margin-bottom:12px;
-}
-.agent-name{font-size:15px;font-weight:700;margin-bottom:3px}
-.agent-role{font-size:11px;color:var(--muted);line-height:1.4;margin-bottom:12px}
-.agent-status{display:flex;align-items:center;gap:5px;font-size:10px;font-family:'JetBrains Mono',monospace}
-.agent-status .dot{width:5px;height:5px;border-radius:50%}
-.dot-green{background:var(--green);box-shadow:0 0 6px var(--green)}
-.dot-amber{background:var(--orange)}
-.agent-tasks{margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:4px}
-.agent-task{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace}
-.agent-task::before{content:'›';color:var(--accent);font-size:12px}
-.agent-bar{height:2px;background:var(--border);border-radius:1px;margin-top:12px;overflow:hidden}
-.agent-bar-fill{height:100%;border-radius:1px;transition:width 1s ease}
+.sec-hd::after{content:'';flex:1;height:1px;background:var(--border)}
 
-/* Bottom grid */
-.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:900px){.bottom-grid{grid-template-columns:1fr}}
-
-/* Platforms */
-.platforms-panel,.activity-panel{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px}
-.platforms-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-.platform{
-  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
-  padding:12px;display:flex;align-items:center;gap:10px;
-  transition:border-color 0.15s;cursor:pointer;
+/* ── Metric strip ────────────────────────────────────────── */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.met{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px 18px;position:relative;overflow:hidden;
+  transition:border-color .2s,transform .2s;cursor:default;
 }
-.platform:hover{border-color:var(--border2)}
-.platform-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.platform-name{font-size:12px;font-weight:600}
-.platform-handle{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
-.platform-badge{margin-left:auto;font-size:9px;padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-weight:500}
-.badge-live{background:rgba(34,197,94,0.15);color:var(--green)}
-.badge-soon{background:rgba(249,115,22,0.15);color:var(--orange)}
-
-/* Activity feed */
-.feed{display:flex;flex-direction:column;gap:0;margin-top:14px;max-height:360px;overflow-y:auto}
-.feed::-webkit-scrollbar{width:3px}
-.feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-.feed-item{
-  display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:flex-start;
-  padding:10px 0;border-bottom:1px solid var(--border);
+.met:hover{border-color:var(--border2);transform:translateY(-1px)}
+.met-glow{
+  position:absolute;top:-20px;right:-20px;width:80px;height:80px;
+  border-radius:50%;opacity:.07;pointer-events:none;
 }
-.feed-item:last-child{border-bottom:none}
-.feed-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:1px}
-.feed-text{font-size:12px;line-height:1.5}
+.met-label{font-size:9px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.1em;margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+.met-val{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
+.met-sub{font-size:10px;color:var(--muted);margin-top:5px;
+  font-family:'JetBrains Mono',monospace}
+.col-gold{color:var(--accent)}
+.col-teal{color:var(--accent2)}
+.col-green{color:var(--green)}
+.col-purple{color:var(--purple)}
+.col-red{color:var(--accent3)}
+
+/* ── Main grid ───────────────────────────────────────────── */
+.grid-main{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+
+/* ── Agents ──────────────────────────────────────────────── */
+.agents{display:flex;flex-direction:column;gap:8px}
+.agent{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);
+  padding:16px 18px;display:grid;grid-template-columns:42px 1fr auto;
+  gap:12px;align-items:center;cursor:pointer;transition:all .18s;
+  position:relative;overflow:hidden;
+}
+.agent::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:0 3px 3px 0;opacity:0;transition:opacity .2s;
+}
+.agent:hover{border-color:var(--border2);transform:translateX(2px)}
+.agent:hover::before{opacity:1}
+.agent.shield::before{background:var(--orange)}
+.agent.pulse::before{background:var(--accent2)}
+.agent.reach::before{background:var(--accent)}
+.agent.intel::before{background:var(--purple)}
+.agent.amplify::before{background:var(--accent3)}
+.ag-icon{
+  width:42px;height:42px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  flex-shrink:0;
+}
+.ag-body{}
+.ag-name{font-size:14px;font-weight:700;margin-bottom:1px}
+.ag-desc{font-size:11px;color:var(--muted)}
+.ag-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.ag-status{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;font-family:'JetBrains Mono',monospace;
+  padding:3px 8px;border-radius:20px;white-space:nowrap;
+}
+.st-active{background:var(--green-dim);color:var(--green)}
+.ag-bar-wrap{width:80px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.ag-bar{height:100%;border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+
+/* ── Right column ────────────────────────────────────────── */
+.right-col{display:flex;flex-direction:column;gap:12px}
+
+/* ── Panel base ──────────────────────────────────────────── */
+.panel{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px;
+}
+
+/* ── Live feed ───────────────────────────────────────────── */
+.feed-list{display:flex;flex-direction:column;gap:0;max-height:220px;overflow-y:auto}
+.feed-list::-webkit-scrollbar{width:0}
+.feed-row{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:8px 0;border-bottom:1px solid var(--border);
+  animation:fade-in .35s ease both;
+}
+.feed-row:last-child{border-bottom:none}
+@keyframes fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.feed-dot{
+  width:6px;height:6px;border-radius:50%;margin-top:5px;flex-shrink:0;
+}
+.feed-text{flex:1;font-size:11px;line-height:1.45;color:var(--text2)}
 .feed-text b{color:var(--text);font-weight:600}
-.feed-text span{color:var(--muted)}
-.feed-time{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.feed-ts{font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;
+  white-space:nowrap;margin-top:2px;flex-shrink:0}
 
-/* Command bar */
-.command-bar{
-  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
-  padding:20px;display:flex;align-items:center;gap:12px;
+/* ── Integrations ────────────────────────────────────────── */
+.integ-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.integ{
+  display:flex;align-items:center;gap:8px;padding:9px 10px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--r3);
+  transition:border-color .15s;cursor:pointer;
 }
-.command-prompt{font-size:14px;color:var(--accent);font-family:'JetBrains Mono',monospace;white-space:nowrap}
-.command-input{
-  flex:1;background:transparent;border:none;outline:none;
-  font-size:14px;color:var(--text);font-family:'JetBrains Mono',monospace;
+.integ:hover{border-color:var(--border2)}
+.integ-sym{
+  font-size:13px;width:26px;height:26px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.integ-info{flex:1;min-width:0}
+.integ-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.integ-handle{font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.integ-badge{
+  font-size:8px;padding:2px 5px;border-radius:4px;
+  font-family:'JetBrains Mono',monospace;font-weight:500;flex-shrink:0;
+}
+.badge-on{background:rgba(34,197,94,.12);color:var(--green)}
+.badge-off{background:rgba(239,68,68,.1);color:var(--red)}
+
+/* ── Bottom row ──────────────────────────────────────────── */
+.grid-bottom{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+
+/* ── Repos ───────────────────────────────────────────────── */
+.repos-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px}
+.repo{
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--r3);
+  padding:10px 12px;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.repo:hover{border-color:var(--accent);background:rgba(232,197,71,.03)}
+.repo-name{font-size:11px;font-weight:600}
+.repo-lang{font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.repo-arrow{font-size:10px;color:var(--muted)}
+
+/* ── Command bar ─────────────────────────────────────────── */
+.cmd-wrap{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);
+  overflow:hidden;transition:border-color .2s;
+}
+.cmd-wrap:focus-within{border-color:rgba(232,197,71,.35);box-shadow:0 0 0 3px rgba(232,197,71,.07)}
+.cmd-top{display:flex;align-items:center;gap:0}
+.cmd-prefix{
+  padding:14px 14px 14px 18px;font-size:13px;
+  color:var(--accent);font-family:'JetBrains Mono',monospace;
+  white-space:nowrap;flex-shrink:0;opacity:.7;
+}
+.cmd-input{
+  flex:1;padding:14px 0;background:transparent;border:none;outline:none;
+  font-size:13px;color:var(--text);font-family:'JetBrains Mono',monospace;
   caret-color:var(--accent);
 }
-.command-input::placeholder{color:var(--muted)}
-.command-send{
-  padding:8px 20px;background:var(--accent);color:#000;border:none;
-  border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
-  font-family:'Syne',sans-serif;transition:all 0.15s;white-space:nowrap;
+.cmd-input::placeholder{color:var(--muted)}
+.cmd-fire{
+  padding:10px 20px;margin:8px;background:var(--accent);color:#000;
+  border:none;border-radius:var(--r3);font-size:11px;font-weight:700;
+  cursor:pointer;font-family:'Syne',sans-serif;transition:all .15s;white-space:nowrap;
 }
-.command-send:hover{background:#F0CF4A}
-.command-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.chip{
-  padding:5px 12px;border:1px solid var(--border);border-radius:20px;
-  font-size:11px;color:var(--muted);cursor:pointer;transition:all 0.15s;
+.cmd-fire:hover{background:#F0CF4A;box-shadow:0 4px 14px rgba(232,197,71,.3)}
+.cmd-chips{
+  display:flex;flex-wrap:wrap;gap:5px;padding:10px 14px 14px;
+  border-top:1px solid var(--border);
+}
+.cmd-chip{
+  padding:4px 10px;border:1px solid var(--border);border-radius:20px;
+  font-size:10px;color:var(--muted);cursor:pointer;transition:all .15s;
   font-family:'JetBrains Mono',monospace;
 }
-.chip:hover{border-color:var(--accent);color:var(--accent)}
+.cmd-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 
-/* Modal */
-.modal-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);
-  z-index:100;display:flex;align-items:center;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity 0.2s;
+/* ── Response panel ──────────────────────────────────────── */
+.resp-panel{
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);
+  padding:14px 16px;font-size:12px;font-family:'JetBrains Mono',monospace;
+  color:var(--text2);line-height:1.6;
+  max-height:120px;overflow-y:auto;display:none;
 }
-.modal-overlay.open{opacity:1;pointer-events:all}
+.resp-panel.show{display:block}
+.resp-panel::-webkit-scrollbar{width:0}
+.resp-panel .resp-loading{
+  display:flex;align-items:center;gap:8px;color:var(--muted)
+}
+.spinner{
+  width:12px;height:12px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Modal ───────────────────────────────────────────────── */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  backdrop-filter:blur(6px);z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.overlay.open{opacity:1;pointer-events:all}
 .modal{
-  background:var(--bg2);border:1px solid var(--border2);border-radius:20px;
-  width:540px;max-width:92vw;padding:28px;position:relative;
-  transform:translateY(16px);transition:transform 0.2s;
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:20px;width:520px;max-width:92vw;
+  padding:28px;position:relative;
+  transform:translateY(20px) scale(.97);
+  transition:transform .25s cubic-bezier(.4,0,.2,1);
+  max-height:90vh;overflow-y:auto;
 }
-.modal-overlay.open .modal{transform:translateY(0)}
-.modal-close{
-  position:absolute;top:16px;right:16px;width:28px;height:28px;
+.modal::-webkit-scrollbar{width:0}
+.overlay.open .modal{transform:none}
+.modal-x{
+  position:absolute;top:14px;right:14px;width:28px;height:28px;
   border-radius:8px;border:1px solid var(--border);background:transparent;
-  color:var(--muted);cursor:pointer;font-size:14px;
-  display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+  color:var(--muted);cursor:pointer;font-size:13px;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
 }
-.modal-close:hover{border-color:var(--border2);color:var(--text)}
-.modal-header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
-.modal-glyph{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px}
-.modal-title{font-size:20px;font-weight:800}
-.modal-subtitle{font-size:12px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace}
-.modal-section{margin-bottom:18px}
-.modal-section-label{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:8px;font-family:'JetBrains Mono',monospace}
-.modal-tasks{display:flex;flex-direction:column;gap:6px}
-.modal-task{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace}
-.modal-task::before{content:'›';color:var(--accent)}
-.modal-actions{display:flex;gap:8px;margin-top:20px}
-.btn-primary{flex:1;padding:10px;background:var(--accent);color:#000;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.15s}
-.btn-primary:hover{background:#F0CF4A}
-.btn-secondary{flex:1;padding:10px;background:transparent;color:var(--text);border:1px solid var(--border2);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.15s}
-.btn-secondary:hover{background:var(--bg3)}
-
-/* Toast */
-#toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(40px);
-  background:var(--bg2);border:1px solid var(--accent);color:var(--accent);
-  padding:10px 20px;border-radius:10px;font-size:12px;font-family:'JetBrains Mono',monospace;
-  opacity:0;transition:all 0.3s;z-index:999;pointer-events:none;
+.modal-x:hover{background:var(--bg3);color:var(--text)}
+.modal-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.modal-ico{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.modal-name{font-size:20px;font-weight:800}
+.modal-sub{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.modal-sec{margin-bottom:18px}
+.modal-sec-hd{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+.modal-tasks{display:flex;flex-direction:column;gap:5px}
+.modal-task{
+  display:flex;align-items:flex-start;gap:8px;padding:8px 10px;
+  background:var(--bg3);border-radius:8px;font-size:11px;
+  font-family:'JetBrains Mono',monospace;color:var(--text2);
 }
+.modal-task::before{content:'›';color:var(--accent);font-size:13px;flex-shrink:0}
+.modal-btns{display:flex;gap:8px;margin-top:20px}
+.btn-a{
+  flex:1;padding:10px;background:var(--accent);color:#000;border:none;
+  border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'Syne',sans-serif;transition:all .15s;
+}
+.btn-a:hover{background:#F0CF4A;box-shadow:0 4px 14px rgba(232,197,71,.3)}
+.btn-b{
+  flex:1;padding:10px;background:transparent;color:var(--text);
+  border:1px solid var(--border2);border-radius:10px;font-size:12px;
+  font-weight:600;cursor:pointer;font-family:'Syne',sans-serif;transition:all .15s;
+}
+.btn-b:hover{background:var(--bg3)}
 
-/* Animations */
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.main > *{animation:fadeUp 0.4s ease both}
-.main > *:nth-child(1){animation-delay:0.05s}
-.main > *:nth-child(2){animation-delay:0.10s}
-.main > *:nth-child(3){animation-delay:0.15s}
-.main > *:nth-child(4){animation-delay:0.20s}
-.main > *:nth-child(5){animation-delay:0.25s}
-.main > *:nth-child(6){animation-delay:0.30s}
-
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+/* ── Stagger animation ───────────────────────────────────── */
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.body > *{animation:up .4s ease both}
+.body > *:nth-child(1){animation-delay:.04s}
+.body > *:nth-child(2){animation-delay:.09s}
+.body > *:nth-child(3){animation-delay:.14s}
+.body > *:nth-child(4){animation-delay:.19s}
+.body > *:nth-child(5){animation-delay:.24s}
 </style>
 </head>
 <body>
 <div class="shell">
 
-  <!-- SIDEBAR -->
-  <nav class="sidebar">
-    <div class="sidebar-logo">A</div>
-    <button class="nav-btn active" title="Dashboard">⚡</button>
-    <button class="nav-btn" title="Agents">🤖</button>
-    <button class="nav-btn" title="Social">📡</button>
-    <button class="nav-btn" title="Inbox">📨</button>
-    <button class="nav-btn" title="Research">🔍</button>
-    <button class="nav-btn" title="Music">🎵</button>
-    <button class="nav-btn" title="Security">🛡</button>
-    <div class="sidebar-bottom">
-      <div class="live-dot"></div>
-    </div>
-  </nav>
+<!-- ── SIDEBAR ──────────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="logo">A</div>
+  <button class="nav-icon on" title="Overview" onclick="setNav(this)">⚡</button>
+  <button class="nav-icon"   title="Agents"   onclick="setNav(this)">◈</button>
+  <button class="nav-icon"   title="Social"   onclick="setNav(this)">◎</button>
+  <button class="nav-icon"   title="Inbox"    onclick="setNav(this)">✉</button>
+  <button class="nav-icon"   title="Intel"    onclick="setNav(this)">◬</button>
+  <button class="nav-icon"   title="Music"    onclick="setNav(this)">♪</button>
+  <div class="sidebar-bottom">
+    <div class="live-pulse" title="All systems live"></div>
+    <div class="uptime-badge" id="uptimeBadge">0h 0m</div>
+  </div>
+</nav>
 
-  <!-- MAIN -->
-  <main class="main">
+<!-- ── MAIN ──────────────────────────────────────────────── -->
+<div class="main">
 
-    <!-- TOP BAR -->
-    <div class="topbar">
-      <div class="topbar-left">
-        <h1>AKILI <span>OS</span></h1>
-        <div class="topbar-sub mono" id="clock">Loading...</div>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div class="greeting">
+        <span id="greet">Good morning,</span>
+        <span class="name">Justin.</span>
       </div>
-      <div class="topbar-right">
-        <div class="status-chip"><div class="dot"></div>All agents active</div>
-        <div class="status-chip">🌍 Africa + Canada</div>
-        <button class="cmd-pill" onclick="openModal('shield')">⚡ Run Health Check</button>
+      <div class="header-meta">
+        <span id="clock">Loading...</span>
+        <span class="sep">·</span>
+        <span>St. Catharines, ON</span>
+        <span class="sep">·</span>
+        <span>creova.one</span>
       </div>
     </div>
+    <div class="header-right">
+      <div class="chip"><span class="dot"></span>5 agents active</div>
+      <div class="chip" id="integChip">Loading...</div>
+      <button class="run-btn" onclick="openAgent('shield')">⚡ Health Check</button>
+    </div>
+  </header>
+
+  <!-- SCROLLABLE BODY -->
+  <div class="body">
 
     <!-- METRICS -->
-    <div class="metrics">
-      <div class="metric gold">
-        <div class="metric-label">Platforms</div>
-        <div class="metric-val gold" id="m-platforms">—</div>
-        <div class="metric-delta" id="m-platforms-sub">Loading…</div>
-      </div>
-      <div class="metric teal">
-        <div class="metric-label">Active Agents</div>
-        <div class="metric-val teal">5</div>
-        <div class="metric-delta">Shield · Pulse · Reach · Intel · Amplify</div>
-      </div>
-      <div class="metric green">
-        <div class="metric-label">GitHub Repos</div>
-        <div class="metric-val green">8</div>
-        <div class="metric-delta">creova-gif monitored</div>
-      </div>
-      <div class="metric purple">
-        <div class="metric-label">Snap Streak</div>
-        <div class="metric-val purple" id="m-streak">—</div>
-        <div class="metric-delta" id="m-streak-sub">day streak · jay-mafie</div>
-      </div>
-      <div class="metric red">
-        <div class="metric-label">Morning Brief</div>
-        <div class="metric-val red">8AM</div>
-        <div class="metric-delta">Daily → Telegram</div>
-      </div>
-    </div>
-
-    <!-- AGENTS -->
     <div>
-      <div class="section-title">5 Specialized Agents</div>
-      <div class="agents">
+      <div class="sec-hd">Command Overview</div>
+      <div class="metrics">
+        <div class="met">
+          <div class="met-glow" style="background:var(--accent)"></div>
+          <div class="met-label">Platforms</div>
+          <div class="met-val col-gold" data-target="10">0</div>
+          <div class="met-sub">social accounts</div>
+        </div>
+        <div class="met">
+          <div class="met-glow" style="background:var(--accent2)"></div>
+          <div class="met-label">Agents Online</div>
+          <div class="met-val col-teal" data-target="5">0</div>
+          <div class="met-sub">Shield · Pulse · Reach · Intel · Amplify</div>
+        </div>
+        <div class="met">
+          <div class="met-glow" style="background:var(--green)"></div>
+          <div class="met-label">GitHub Repos</div>
+          <div class="met-val col-green" data-target="8">0</div>
+          <div class="met-sub">creova-gif monitored</div>
+        </div>
+        <div class="met">
+          <div class="met-glow" style="background:var(--purple)"></div>
+          <div class="met-label">Heartbeat</div>
+          <div class="met-val col-purple">30m</div>
+          <div class="met-sub">auto-check interval</div>
+        </div>
+        <div class="met">
+          <div class="met-glow" style="background:var(--accent3)"></div>
+          <div class="met-label">Connected</div>
+          <div class="met-val col-red" id="connectedMet">—</div>
+          <div class="met-sub" id="connectedSub">integrations live</div>
+        </div>
+      </div>
+    </div>
 
-        <div class="agent-card" onclick="openModal('shield')">
-          <div class="agent-glyph" style="background:rgba(249,115,22,0.12)">🛡</div>
-          <div class="agent-name">SHIELD</div>
-          <div class="agent-role">Security, repos &amp; infrastructure protection</div>
-          <div class="agent-status"><div class="dot dot-green"></div>Active · 30min scan</div>
-          <div class="agent-tasks">
-            <div class="agent-task">8 repos monitored</div>
-            <div class="agent-task">creova.one uptime</div>
-            <div class="agent-task">API key protection</div>
+    <!-- AGENTS + SIDEBAR PANELS -->
+    <div class="grid-main">
+
+      <!-- LEFT: Agents -->
+      <div>
+        <div class="sec-hd">5 Specialized Agents</div>
+        <div class="agents">
+
+          <div class="agent shield" onclick="openAgent('shield')">
+            <div class="ag-icon" style="background:rgba(249,115,22,.1)">🛡</div>
+            <div class="ag-body">
+              <div class="ag-name">SHIELD</div>
+              <div class="ag-desc">Security · GitHub · System health · Uptime monitoring</div>
+            </div>
+            <div class="ag-right">
+              <div class="ag-status st-active"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>&nbsp;Active</div>
+              <div class="ag-bar-wrap"><div class="ag-bar" style="width:0%;background:var(--orange)" data-w="92"></div></div>
+            </div>
           </div>
-          <div class="agent-bar"><div class="agent-bar-fill" style="width:92%;background:var(--orange)"></div></div>
+
+          <div class="agent pulse" onclick="openAgent('pulse')">
+            <div class="ag-icon" style="background:rgba(78,205,196,.1)">📡</div>
+            <div class="ag-body">
+              <div class="ag-name">PULSE</div>
+              <div class="ag-desc">Social media · Carousel builder · A/B experiments · Hashtag intel</div>
+            </div>
+            <div class="ag-right">
+              <div class="ag-status st-active"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>&nbsp;Active</div>
+              <div class="ag-bar-wrap"><div class="ag-bar" style="width:0%;background:var(--accent2)" data-w="78"></div></div>
+            </div>
+          </div>
+
+          <div class="agent reach" onclick="openAgent('reach')">
+            <div class="ag-icon" style="background:rgba(232,197,71,.08)">📨</div>
+            <div class="ag-body">
+              <div class="ag-name">REACH</div>
+              <div class="ag-desc">Gmail (personal + biz) · DM auto-reply · Content repurposing</div>
+            </div>
+            <div class="ag-right">
+              <div class="ag-status st-active"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>&nbsp;Active</div>
+              <div class="ag-bar-wrap"><div class="ag-bar" style="width:0%;background:var(--accent)" data-w="65"></div></div>
+            </div>
+          </div>
+
+          <div class="agent intel" onclick="openAgent('intel')">
+            <div class="ag-icon" style="background:rgba(167,139,250,.1)">🔍</div>
+            <div class="ag-body">
+              <div class="ag-name">INTEL</div>
+              <div class="ag-desc">Research · VC tracker · Lead generation · Daily briefs at 8AM</div>
+            </div>
+            <div class="ag-right">
+              <div class="ag-status st-active"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>&nbsp;Active</div>
+              <div class="ag-bar-wrap"><div class="ag-bar" style="width:0%;background:var(--purple)" data-w="55"></div></div>
+            </div>
+          </div>
+
+          <div class="agent amplify" onclick="openAgent('amplify')">
+            <div class="ag-icon" style="background:rgba(255,107,107,.1)">🔊</div>
+            <div class="ag-body">
+              <div class="ag-name">AMPLIFY</div>
+              <div class="ag-desc">Music promo · DistroKid · Playlist pitching · Snap Creator score</div>
+            </div>
+            <div class="ag-right">
+              <div class="ag-status st-active"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>&nbsp;Active</div>
+              <div class="ag-bar-wrap"><div class="ag-bar" style="width:0%;background:var(--accent3)" data-w="44"></div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT: Feed + Integrations -->
+      <div class="right-col">
+
+        <!-- Live feed -->
+        <div class="panel">
+          <div class="sec-hd" style="margin-bottom:8px">Live Activity</div>
+          <div class="feed-list" id="feed">
+            <div class="feed-row">
+              <div class="feed-dot" style="background:var(--muted)"></div>
+              <div class="feed-text"><span>Loading activity feed...</span></div>
+              <div class="feed-ts">now</div>
+            </div>
+          </div>
         </div>
 
-        <div class="agent-card" onclick="openModal('pulse')">
-          <div class="agent-glyph" style="background:rgba(78,205,196,0.12)">📡</div>
-          <div class="agent-name">PULSE</div>
-          <div class="agent-role">All social media — posting, scheduling, growth</div>
-          <div class="agent-status"><div class="dot dot-green"></div>Active · 4–6 posts/day</div>
-          <div class="agent-tasks">
-            <div class="agent-task">10 social accounts</div>
-            <div class="agent-task">Weekly content cal</div>
-            <div class="agent-task">A/B experiments</div>
+        <!-- Integrations -->
+        <div class="panel">
+          <div class="sec-hd" style="margin-bottom:10px">Platform Status</div>
+          <div class="integ-grid" id="integGrid">
+            <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">Loading...</div>
           </div>
-          <div class="agent-bar"><div class="agent-bar-fill" style="width:78%;background:var(--accent2)"></div></div>
-        </div>
-
-        <div class="agent-card" onclick="openModal('reach')">
-          <div class="agent-glyph" style="background:rgba(232,197,71,0.10)">📨</div>
-          <div class="agent-name">REACH</div>
-          <div class="agent-role">Email, DMs, WhatsApp &amp; content repurposing</div>
-          <div class="agent-status"><div class="dot dot-green"></div>Active · watching inbox</div>
-          <div class="agent-tasks">
-            <div class="agent-task">Personal + biz Gmail</div>
-            <div class="agent-task">DM auto-reply</div>
-            <div class="agent-task">Content repurpose</div>
-          </div>
-          <div class="agent-bar"><div class="agent-bar-fill" style="width:65%;background:var(--accent)"></div></div>
-        </div>
-
-        <div class="agent-card" onclick="openModal('intel')">
-          <div class="agent-glyph" style="background:rgba(167,139,250,0.12)">🔍</div>
-          <div class="agent-name">INTEL</div>
-          <div class="agent-role">Research, leads, VC tracking &amp; daily briefs</div>
-          <div class="agent-status"><div class="dot dot-green"></div>Active · brief at 8AM</div>
-          <div class="agent-tasks">
-            <div class="agent-task">GoPay VC tracker</div>
-            <div class="agent-task">Lead generation</div>
-            <div class="agent-task">Competitor intel</div>
-          </div>
-          <div class="agent-bar"><div class="agent-bar-fill" style="width:55%;background:var(--purple)"></div></div>
-        </div>
-
-        <div class="agent-card" onclick="openModal('amplify')">
-          <div class="agent-glyph" style="background:rgba(255,107,107,0.12)">🔊</div>
-          <div class="agent-name">AMPLIFY</div>
-          <div class="agent-role">Music promo, brand growth &amp; Snap Creator</div>
-          <div class="agent-status"><div class="dot dot-green"></div>Active · stream tracking</div>
-          <div class="agent-tasks">
-            <div class="agent-task">DistroKid analytics</div>
-            <div class="agent-task">Playlist pitching</div>
-            <div class="agent-task">Snapchat Creator</div>
-          </div>
-          <div class="agent-bar"><div class="agent-bar-fill" style="width:44%;background:var(--accent3)"></div></div>
         </div>
 
       </div>
     </div>
 
-    <!-- BOTTOM GRID: PLATFORMS + FEED -->
-    <div class="bottom-grid">
+    <!-- BOTTOM ROW: Repos + Command -->
+    <div class="grid-bottom">
 
-      <div class="platforms-panel">
-        <div class="section-title">Platform Connections</div>
-        <div class="platforms-grid" id="platform-grid">
-          <!-- filled by JS -->
+      <!-- Repos -->
+      <div>
+        <div class="sec-hd">GitHub Repositories</div>
+        <div class="repos-grid" id="reposGrid">
+          <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">Loading...</div>
         </div>
       </div>
 
-      <div class="activity-panel">
-        <div class="section-title">Live Activity Feed</div>
-        <div class="feed" id="feed">
-          <div class="feed-item">
-            <div class="feed-icon" style="background:rgba(232,197,71,0.10)">⚡</div>
-            <div class="feed-text"><b>AKILI</b> <span>loading activity…</span></div>
-            <div class="feed-time">now</div>
+      <!-- Streak -->
+      <div>
+        <div class="sec-hd">Snapchat Creator</div>
+        <div class="panel" style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+          <div style="padding:8px 0;border-right:1px solid var(--border);text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--accent)" id="streakVal">—</div>
+            <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:4px">day streak</div>
+          </div>
+          <div style="padding:8px 0;text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--accent2)" id="totalDays">—</div>
+            <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:4px">total days</div>
           </div>
         </div>
+        <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:8px;text-align:center" id="lastPosted"></div>
       </div>
 
     </div>
 
     <!-- COMMAND BAR -->
     <div>
-      <div class="section-title">Command Akili</div>
-      <div class="command-bar">
-        <div class="command-prompt">› akili</div>
-        <input class="command-input" id="cmdInput"
-               placeholder="Tell Akili what to do… (same as Telegram)"
-               onkeydown="handleCmd(event)"/>
-        <button class="command-send" onclick="fireCmd()">Execute ↗</button>
+      <div class="sec-hd">Command Akili</div>
+      <div class="cmd-wrap">
+        <div class="cmd-top">
+          <div class="cmd-prefix">›</div>
+          <input class="cmd-input" id="cmdIn"
+            placeholder="Tell Akili what to do... (same commands as Telegram)"
+            onkeydown="if(event.key==='Enter')fire()"/>
+          <button class="cmd-fire" onclick="fire()">Execute ↗</button>
+        </div>
+        <div class="cmd-chips">
+          <div class="cmd-chip" onclick="quick('generate this week content calendar for all accounts')">📅 Week calendar</div>
+          <div class="cmd-chip" onclick="quick('run GitHub org scan for all 8 creova repos')">⬡ GitHub scan</div>
+          <div class="cmd-chip" onclick="quick('check both Gmail inboxes and flag urgent emails')">✉ Check inboxes</div>
+          <div class="cmd-chip" onclick="quick('vc tracker GoPay East Africa investors')">💰 GoPay VC tracker</div>
+          <div class="cmd-chip" onclick="quick('create Snapchat story script for today')">◎ Snap script</div>
+          <div class="cmd-chip" onclick="quick('health check all platforms')">⚡ Health check</div>
+          <div class="cmd-chip" onclick="quick('generate a music release campaign for CREOVA Music')">♪ Music campaign</div>
+          <div class="cmd-chip" onclick="quick('find leads for CREOVA Solutions Canada')">◬ Lead gen</div>
+          <div class="cmd-chip" onclick="quick('carousel CREOVA tech innovation Africa')">◈ Carousel builder</div>
+          <div class="cmd-chip" onclick="quick('hashtags tech')">🏷 Hashtag sets</div>
+        </div>
       </div>
-      <div class="command-chips">
-        <div class="chip" onclick="copyCmd('generate this week content calendar for all accounts')">📅 Weekly calendar</div>
-        <div class="chip" onclick="copyCmd('run GitHub org scan for all 8 repos')">🐙 GitHub scan</div>
-        <div class="chip" onclick="copyCmd('check both Gmail inboxes and flag urgent emails')">📧 Check inboxes</div>
-        <div class="chip" onclick="copyCmd('generate GoPay VC tracker with top 5 investors')">💰 GoPay VC tracker</div>
-        <div class="chip" onclick="copyCmd('create Snapchat story script for today')">👻 Snap script</div>
-        <div class="chip" onclick="copyCmd('run integration health check for all platforms')">🔌 Health check</div>
-        <div class="chip" onclick="copyCmd('generate a music release campaign for CREOVA Music')">🎵 Music campaign</div>
-        <div class="chip" onclick="copyCmd('generate leads for CREOVA Solutions this week')">🎯 Lead gen</div>
-      </div>
+      <div class="resp-panel" id="resp"></div>
     </div>
 
-  </main>
-</div>
+  </div><!-- /body -->
+</div><!-- /main -->
+</div><!-- /shell -->
 
-<!-- AGENT MODALS -->
-<div class="modal-overlay" id="modal" onclick="closeModal(event)">
-  <div class="modal" id="modalContent">
-    <button class="modal-close" onclick="closeModal()">✕</button>
-    <div class="modal-header">
-      <div class="modal-glyph" id="mGlyph"></div>
+<!-- ── AGENT MODAL ────────────────────────────────────────── -->
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="modal" id="modal">
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <div class="modal-head">
+      <div class="modal-ico" id="mIco"></div>
       <div>
-        <div class="modal-title" id="mTitle"></div>
-        <div class="modal-subtitle" id="mSub"></div>
+        <div class="modal-name" id="mName"></div>
+        <div class="modal-sub" id="mSub"></div>
       </div>
     </div>
-    <div class="modal-section">
-      <div class="modal-section-label">Responsibilities</div>
+    <div class="modal-sec">
+      <div class="modal-sec-hd">Responsibilities</div>
       <div class="modal-tasks" id="mTasks"></div>
     </div>
-    <div class="modal-section">
-      <div class="modal-section-label">Model</div>
-      <div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--muted)" id="mModel"></div>
+    <div class="modal-sec">
+      <div class="modal-sec-hd">Model</div>
+      <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace" id="mModel"></div>
     </div>
-    <div class="modal-actions">
-      <button class="btn-primary" onclick="modalAction1()">Copy Command ↗</button>
-      <button class="btn-secondary" onclick="closeModal()">Close</button>
+    <div class="modal-btns">
+      <button class="btn-a" id="mRun">Run Agent</button>
+      <button class="btn-b" onclick="closeModal()">Close</button>
     </div>
   </div>
 </div>
 
-<div id="toast">Copied to clipboard!</div>
-
 <script>
-// ── Clock ──────────────────────────────────────────────────
-function updateClock(){
-  const now = new Date();
-  document.getElementById('clock').textContent =
-    now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) +
-    ' · ' + now.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+// ── Constants ─────────────────────────────────────────────
+const SOURCE_COLORS = {
+  SHIELD:'var(--orange)',PULSE:'var(--accent2)',
+  REACH:'var(--accent)',INTEL:'var(--purple)',
+  AMPLIFY:'var(--accent3)',default:'var(--muted)'
+};
+function srcColor(s){
+  for(const k of Object.keys(SOURCE_COLORS))
+    if(s.toUpperCase().includes(k)) return SOURCE_COLORS[k];
+  return SOURCE_COLORS.default;
 }
-updateClock(); setInterval(updateClock, 1000);
 
-// ── Platform config ────────────────────────────────────────
-const PLATFORM_CONFIG = {
-  twitter:   {icon:'𝕏',  bg:'rgba(29,161,242,0.10)',  name:'Twitter / X',  handle:'@justin_mafie',       cmd:'show Twitter analytics for @justin_mafie'},
-  github:    {icon:'🐙', bg:'rgba(255,255,255,0.06)', name:'GitHub',        handle:'creova-gif · 8 repos', cmd:'run GitHub org scan for all 8 repos'},
-  instagram: {icon:'📸', bg:'rgba(225,48,108,0.12)',  name:'Instagram',     handle:'4 accounts',           cmd:'show Instagram insights for all 4 accounts'},
-  linkedin:  {icon:'💼', bg:'rgba(10,102,194,0.12)',  name:'LinkedIn',      handle:'Justin + CREOVA',      cmd:'show LinkedIn stats for Justin Mafie and CREOVA page'},
-  snapchat:  {icon:'👻', bg:'rgba(255,252,0,0.08)',   name:'Snapchat',      handle:'jay-mafie',            cmd:'show Snapchat Creator tracker for jay-mafie'},
-  tiktok:    {icon:'🎵', bg:'rgba(255,0,80,0.12)',    name:'TikTok',        handle:'@creovamusic',         cmd:'show TikTok analytics for @creovamusic'},
-  facebook:  {icon:'📘', bg:'rgba(24,119,242,0.12)',  name:'Facebook',      handle:'Justin + CREOVA Biz',  cmd:'show Facebook page stats'},
-  gmail:     {icon:'📧', bg:'rgba(234,67,53,0.12)',   name:'Gmail',         handle:'Personal + Business',  cmd:'check both Gmail inboxes for urgent emails'},
-};
+// ── Clock ─────────────────────────────────────────────────
+function tick(){
+  const now = new Date();
+  const h = now.getHours();
+  document.getElementById('greet').textContent =
+    h<12?'Good morning,':(h<17?'Good afternoon,':'Good evening,');
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+
+    '  ·  '+now.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+}
+tick(); setInterval(tick,1000);
 
-// ── Agent data ─────────────────────────────────────────────
-const AGENTS = {
-  shield: {
-    icon:'🛡', color:'rgba(249,115,22,0.15)', name:'SHIELD',
-    sub:'Security · Infrastructure · GitHub Monitor',
-    tasks:['Monitor all 8 creova-gif repos every 30 min','Check creova.one + all product uptime','Protect all API keys and credentials','Instant Telegram alert on any breach','Never delete without 2x Justin confirmation'],
-    model:'claude-sonnet-4-5 · Fast monitoring loops',
-    cmd:'run GitHub org scan for all 8 repos and report'
-  },
-  pulse: {
-    icon:'📡', color:'rgba(78,205,196,0.15)', name:'PULSE',
-    sub:'Social Media · 10 accounts · 4–6 posts/day',
-    tasks:['@creativeinnovation__ @jj_mafie @sankofastudio__ @creovasolutions','@justin_mafie (X) · Justin Mafie + CREOVA (LinkedIn)','jay-mafie (Snapchat) · @creovamusic (TikTok)','Justin + CREOVA (Facebook) · Weekly content calendar','A/B posting experiments + growth tracking'],
-    model:'claude-sonnet-4-5 · High-volume content generation',
-    cmd:'generate this week content calendar for all accounts'
-  },
-  reach: {
-    icon:'📨', color:'rgba(232,197,71,0.12)', name:'REACH',
-    sub:'Email · DMs · WhatsApp · Content Repurposing',
-    tasks:['Monitor personal Gmail + CREOVA business email','Auto-reply DMs in Justin Mafie voice on all platforms','Flag urgent emails instantly to Telegram','Repurpose 1 piece of content into all platform formats','Draft email campaigns for music + CREOVA Solutions'],
-    model:'claude-sonnet-4-5 · Fast comms and classification',
-    cmd:'check both Gmail inboxes and flag urgent emails'
-  },
-  intel: {
-    icon:'🔍', color:'rgba(167,139,250,0.15)', name:'INTEL',
-    sub:'Research · Leads · VC Tracking · Daily Briefs',
-    tasks:['Daily 8AM brief → Telegram: market news + priorities','Lead gen for CREOVA Solutions + CREOVA Music deals','GoPay VC tracker: Partech, TLcom, Novastar + more','Deep product research for all 14 CREOVA builds','Competitor monitoring across all markets'],
-    model:'claude-sonnet-4-5 · Deep research and synthesis',
-    cmd:'generate GoPay VC tracker with top 5 East Africa investors'
-  },
-  amplify: {
-    icon:'🔊', color:'rgba(255,107,107,0.15)', name:'AMPLIFY',
-    sub:'Music Promo · Brand Growth · Snap Creator',
-    tasks:['DistroKid + Spotify for Artists stream tracking','Playlist pitching for CREOVA Music releases','Snapchat Creator program score + daily script','Cross-pollinate: music fans ↔ tech audience ↔ personal brand','Posting time experiments + growth optimization'],
-    model:'claude-sonnet-4-5 · Creative promotion and growth',
-    cmd:'create a music release campaign plan for CREOVA Music'
-  },
-};
+// ── Count-up ──────────────────────────────────────────────
+function countUp(el,target,dur=800){
+  let start=null;
+  function step(ts){
+    if(!start)start=ts;
+    const p=Math.min((ts-start)/dur,1);
+    const ease=p<.5?2*p*p:(4-2*p)*p-1;
+    el.textContent=Math.round(ease*target);
+    if(p<1)requestAnimationFrame(step);
+    else el.textContent=target;
+  }
+  requestAnimationFrame(step);
+}
+document.querySelectorAll('.met-val[data-target]').forEach(el=>
+  countUp(el,+el.dataset.target)
+);
 
-let currentAgent = null;
+// ── Agent bars ────────────────────────────────────────────
+setTimeout(()=>{
+  document.querySelectorAll('.ag-bar[data-w]').forEach(el=>{
+    el.style.width=el.dataset.w+'%';
+  });
+},400);
 
-// ── Fetch live status ──────────────────────────────────────
+// ── Sidebar nav ───────────────────────────────────────────
+function setNav(btn){
+  document.querySelectorAll('.nav-icon').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+
+// ── Uptime ticker ─────────────────────────────────────────
+let _uptime='0h 0m';
+function updateUptime(val){
+  _uptime=val;
+  document.getElementById('uptimeBadge').textContent=val;
+}
+
+// ── Fetch status ──────────────────────────────────────────
 async function fetchStatus(){
   try{
-    const r = await fetch('/api/status');
-    const d = await r.json();
-    render(d);
-  }catch(e){ console.error('Status fetch failed',e); }
+    const d=await fetch('/api/status').then(r=>r.json());
+    updateUptime(d.uptime||'—');
+
+    // Connected integrations
+    const conn=d.integrations_connected||0;
+    const total=d.integrations_total||9;
+    document.getElementById('connectedMet').textContent=conn;
+    document.getElementById('connectedSub').textContent=`of ${total} live`;
+    countUp(document.getElementById('connectedMet'),conn,600);
+    document.getElementById('integChip').textContent=`${conn}/${total} integrations`;
+
+    // Feed
+    const feed=document.getElementById('feed');
+    if(d.activity&&d.activity.length){
+      const items=[...d.activity].reverse().slice(0,10);
+      feed.innerHTML=items.map(a=>{
+        const col=srcColor(a.source);
+        return `<div class="feed-row">
+          <div class="feed-dot" style="background:${col}"></div>
+          <div class="feed-text"><b>${a.source}</b> — ${a.msg}</div>
+          <div class="feed-ts">${a.ts}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Integrations
+    if(d.integrations){
+      const grid=document.getElementById('integGrid');
+      grid.innerHTML=Object.entries(d.integrations).map(([k,v])=>`
+        <div class="integ" title="${v.handle}">
+          <div class="integ-sym" style="background:var(--bg4)">${v.icon}</div>
+          <div class="integ-info">
+            <div class="integ-name">${v.label}</div>
+            <div class="integ-handle">${v.handle}</div>
+          </div>
+          <div class="integ-badge ${v.ok?'badge-on':'badge-off'}">${v.ok?'LIVE':'—'}</div>
+        </div>`).join('');
+    }
+
+    // Repos
+    if(d.github_repos){
+      const rg=document.getElementById('reposGrid');
+      const langs={Gopay:'Python',KayaYourpropertyai:'React',Darsme:'Node',Mentalpath:'React',
+        Aihealthsupport:'Python',GridOs:'Python',Kilimoai:'Python',Budgeteaseapp:'React'};
+      rg.innerHTML=d.github_repos.map(r=>`
+        <div class="repo" onclick="quick('${r} repo status and recent commits')">
+          <div>
+            <div class="repo-name">${r}</div>
+            <div class="repo-lang">${langs[r]||'—'}</div>
+          </div>
+          <div class="repo-arrow">›</div>
+        </div>`).join('');
+    }
+
+    // Streak
+    if(d.snapchat_streak){
+      const s=d.snapchat_streak;
+      document.getElementById('streakVal').textContent=s.streak||0;
+      document.getElementById('totalDays').textContent=s.total_days||0;
+      if(s.last_posted&&s.last_posted!=='—')
+        document.getElementById('lastPosted').textContent='Last posted: '+s.last_posted;
+    }
+
+  }catch(e){console.warn('Status fetch:',e)}
 }
 
-function escHtml(s){
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// ── Command ───────────────────────────────────────────────
+function quick(t){
+  document.getElementById('cmdIn').value=t;
+  document.getElementById('cmdIn').focus();
+}
+function fire(){
+  const v=document.getElementById('cmdIn').value.trim();
+  if(!v)return;
+  const resp=document.getElementById('resp');
+  resp.className='resp-panel show';
+  resp.innerHTML='<div class="resp-loading"><div class="spinner"></div><span>Dispatched to Akili — check Telegram for response</span></div>';
+
+  // Add to feed
+  const feed=document.getElementById('feed');
+  const row=document.createElement('div');
+  row.className='feed-row';
+  row.innerHTML=`
+    <div class="feed-dot" style="background:var(--accent)"></div>
+    <div class="feed-text"><b>YOU</b> — ${v.substring(0,80)}</div>
+    <div class="feed-ts">now</div>`;
+  feed.prepend(row);
+  if(feed.children.length>12)feed.removeChild(feed.lastChild);
+
+  document.getElementById('cmdIn').value='';
+  setTimeout(()=>resp.classList.remove('show'),4000);
 }
 
-function timeAgo(ts){
-  // ts is HH:MM from today's log
-  return ts;
+// ── Agent modal ───────────────────────────────────────────
+const AGENTS={
+  shield:{
+    ico:'🛡',bg:'rgba(249,115,22,.15)',name:'SHIELD',
+    sub:'Security · GitHub · System Health · Uptime',
+    tasks:[
+      'Monitor 8 creova-gif repos every 30 min',
+      'Check creova.one + Akili bot uptime (Replit Reserved VM)',
+      'System health: CPU & memory via psutil',
+      'Secret scanner: detect hardcoded API keys',
+      'Instant Telegram alert on any breach or downtime',
+      'Never deletes anything without 2× Justin confirmation',
+    ],
+    model:'claude-sonnet-4-5 · Fast monitoring loops',
+    cmd:'run GitHub org scan for all 8 creova repos and report',
+  },
+  pulse:{
+    ico:'📡',bg:'rgba(78,205,196,.15)',name:'PULSE',
+    sub:'Social Media · 10 accounts · 4–6 posts/day',
+    tasks:[
+      '@creativeinnovation__ · @jj_mafie · @sankofastudio__ · @creovasolutions (IG)',
+      '@justin_mafie (X/Twitter) · Justin Mafie + CREOVA (LinkedIn)',
+      'jay-mafie (Snapchat) · Justin + CREOVA (Facebook)',
+      '@creovamusic (TikTok) · Carousel builder · A/B experiments',
+      'Hashtag intelligence: tech/music/personal/studio/branding sets',
+      'DALL·E 3 image generation for posts (OpenAI live)',
+    ],
+    model:'claude-sonnet-4-5 · High-volume content generation',
+    cmd:'generate this week content calendar for all accounts',
+  },
+  reach:{
+    ico:'📨',bg:'rgba(232,197,71,.12)',name:'REACH',
+    sub:'Email · DMs · Repurposing · Auto-responder',
+    tasks:[
+      'Monitor ayoubjustin2@gmail.com (personal) — LIVE',
+      'Monitor creativeinnovationspace@gmail.com (business) — LIVE',
+      'Auto-reply DMs in authentic Justin Mafie voice',
+      'Flag urgent emails (investors, press, clients) instantly to Telegram',
+      'Repurpose 1 piece of content into 6 platform formats',
+      'Draft email campaigns for music + CREOVA Solutions',
+    ],
+    model:'claude-sonnet-4-5 · Fast comms and classification',
+    cmd:'check both Gmail inboxes and flag urgent emails',
+  },
+  intel:{
+    ico:'🔍',bg:'rgba(167,139,250,.15)',name:'INTEL',
+    sub:'Research · Leads · VC Tracking · Briefs',
+    tasks:[
+      'Daily 8AM brief → Telegram: market news + today\'s priorities',
+      'VC tracker: GoPay investors (Partech, TLcom, Novastar + more)',
+      'Lead generation: CREOVA Solutions + music deals Canada/Africa',
+      'Outreach pitch generator: personalized from Justin Mafie',
+      'Competitor monitoring across all 8 CREOVA product markets',
+      'Deep research on any topic via web search',
+    ],
+    model:'claude-sonnet-4-5 · Deep research and synthesis',
+    cmd:'vc tracker GoPay East Africa investors',
+  },
+  amplify:{
+    ico:'🔊',bg:'rgba(255,107,107,.15)',name:'AMPLIFY',
+    sub:'Music · Brand Growth · Snap Creator',
+    tasks:[
+      'DistroKid + Spotify for Artists stream tracking',
+      'Playlist pitching for CREOVA Music & Sankofa Studio releases',
+      'Snapchat Creator program score + daily story script',
+      'Cross-pollinate: music fans ↔ tech audience ↔ personal brand',
+      'Posting time experiments + engagement growth optimization',
+      'CREOVA Music release campaign planning',
+    ],
+    model:'claude-sonnet-4-5 · Creative promotion and growth',
+    cmd:'create a music release campaign plan for CREOVA Music latest release',
+  },
+};
+
+let _curAgent=null;
+function openAgent(key){
+  const a=AGENTS[key];
+  if(!a)return;
+  _curAgent=key;
+  document.getElementById('mIco').textContent=a.ico;
+  document.getElementById('mIco').style.background=a.bg;
+  document.getElementById('mName').textContent=a.name;
+  document.getElementById('mSub').textContent=a.sub;
+  document.getElementById('mModel').textContent=a.model;
+  document.getElementById('mTasks').innerHTML=
+    a.tasks.map(t=>`<div class="modal-task">${t}</div>`).join('');
+  document.getElementById('mRun').onclick=()=>{quick(a.cmd);closeModal()};
+  document.getElementById('overlay').classList.add('open');
 }
+function closeModal(){document.getElementById('overlay').classList.remove('open')}
+function maybeClose(e){if(e.target===document.getElementById('overlay'))closeModal()}
 
-function render(d){
-  // Metrics
-  const conn = d.integrations_connected;
-  document.getElementById('m-platforms').textContent = conn + '/8';
-  document.getElementById('m-platforms-sub').textContent = conn === 8 ? 'all platforms live' : (8-conn) + ' still pending';
-
-  const s = d.snapchat_streak;
-  document.getElementById('m-streak').textContent = s.streak || '0';
-  document.getElementById('m-streak-sub').textContent = 'day streak · last: ' + (s.last_posted || '—');
-
-  // Platform grid
-  const pg = document.getElementById('platform-grid');
-  pg.innerHTML = '';
-  Object.entries(d.integrations).forEach(([k, v]) => {
-    const cfg = PLATFORM_CONFIG[k] || {};
-    const live = v.ok;
-    pg.innerHTML += `
-    <div class="platform" onclick="copyCmd('${cfg.cmd||''}')">
-      <div class="platform-icon" style="background:${cfg.bg||'rgba(255,255,255,0.06)'}">${cfg.icon||'?'}</div>
-      <div>
-        <div class="platform-name">${v.label}</div>
-        <div class="platform-handle">${v.handle}</div>
-      </div>
-      <div class="platform-badge ${live?'badge-live':'badge-soon'}">${live?'LIVE':'SETUP'}</div>
-    </div>`;
-  });
-
-  // Activity feed
-  const feed = document.getElementById('feed');
-  const agentColors = {
-    'SHIELD':'rgba(249,115,22,0.12)', 'PULSE':'rgba(78,205,196,0.12)',
-    'REACH':'rgba(232,197,71,0.10)', 'INTEL':'rgba(167,139,250,0.12)',
-    'AMPLIFY':'rgba(255,107,107,0.12)'
-  };
-  const agentIcons = {
-    'SHIELD':'🛡','PULSE':'📡','REACH':'📨','INTEL':'🔍','AMPLIFY':'🔊'
-  };
-  if(d.activity && d.activity.length){
-    const items = [...d.activity].reverse().slice(0,8);
-    feed.innerHTML = items.map(a => {
-      const src = a.source.toUpperCase();
-      const agentKey = Object.keys(agentColors).find(k => src.includes(k)) || 'AKILI';
-      const icon = agentIcons[agentKey] || '⚡';
-      const color = agentColors[agentKey] || 'rgba(232,197,71,0.10)';
-      return `<div class="feed-item">
-        <div class="feed-icon" style="background:${color}">${icon}</div>
-        <div class="feed-text"><b>${escHtml(a.source)}</b> <span>${escHtml(a.msg)}</span></div>
-        <div class="feed-time">${a.ts}</div>
-      </div>`;
-    }).join('');
-  }
-}
-
-// ── Command bar ────────────────────────────────────────────
-function handleCmd(e){ if(e.key==='Enter') fireCmd(); }
-
-function fireCmd(){
-  const v = document.getElementById('cmdInput').value.trim();
-  if(!v) return;
-  copyCmd(v);
-  document.getElementById('cmdInput').value = '';
-}
-
-function copyCmd(cmd){
-  if(!cmd) return;
-  navigator.clipboard.writeText(cmd).then(() => {
-    const t = document.getElementById('toast');
-    t.textContent = '✓ Copied — paste into Telegram';
-    t.style.opacity = '1';
-    t.style.transform = 'translateX(-50%) translateY(0)';
-    setTimeout(() => {
-      t.style.opacity = '0';
-      t.style.transform = 'translateX(-50%) translateY(40px)';
-    }, 2200);
-  });
-}
-
-// ── Agent modals ───────────────────────────────────────────
-function openModal(key){
-  const a = AGENTS[key];
-  if(!a) return;
-  currentAgent = key;
-  const g = document.getElementById('mGlyph');
-  g.textContent = a.icon;
-  g.style.background = a.color;
-  document.getElementById('mTitle').textContent = a.name;
-  document.getElementById('mSub').textContent = a.sub;
-  document.getElementById('mModel').textContent = a.model;
-  document.getElementById('mTasks').innerHTML = a.tasks.map(t=>`<div class="modal-task">${t}</div>`).join('');
-  document.getElementById('modal').classList.add('open');
-}
-
-function modalAction1(){
-  const a = AGENTS[currentAgent];
-  if(a) copyCmd(a.cmd);
-  closeModal();
-}
-
-function closeModal(e){
-  if(e && e.target !== document.getElementById('modal')) return;
-  document.getElementById('modal').classList.remove('open');
-}
-
-// ── Sidebar nav ────────────────────────────────────────────
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', function(){
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    this.classList.add('active');
-  });
-});
-
-// ── Init ───────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────
 fetchStatus();
-setInterval(fetchStatus, 15000);
+setInterval(fetchStatus,15000);
 </script>
 </body>
 </html>"""
