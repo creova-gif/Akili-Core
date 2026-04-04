@@ -12,9 +12,11 @@
 # ============================================================
 
 import os
+import base64
 import logging
 import hashlib
 import secrets
+import urllib.parse
 import aiohttp
 from aiohttp import web
 
@@ -53,22 +55,25 @@ async def handle_auth(request: web.Request) -> web.Response:
         )
 
     state = secrets.token_urlsafe(16)
-    code_verifier = secrets.token_urlsafe(48)
-    code_challenge = hashlib.sha256(code_verifier.encode()).hexdigest()
+    # RFC 7636 PKCE — code_verifier must be high-entropy, code_challenge = BASE64URL(SHA256(verifier))
+    code_verifier  = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
     _state_store[state] = code_verifier
 
+    # RFC 6749 §4.1.1 — all query params must be properly percent-encoded
     params = {
         "client_key":            cfg["client_key"],
         "redirect_uri":          cfg["redirect_uri"],
         "response_type":         "code",
-        "scope":                 ",".join(SCOPES),
+        "scope":                 " ".join(SCOPES),   # RFC 6749 §3.3 — space-delimited
         "state":                 state,
         "code_challenge":        code_challenge,
         "code_challenge_method": "S256",
     }
 
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    url = f"{TIKTOK_AUTH_URL}?{query}"
+    url = f"{TIKTOK_AUTH_URL}?{urllib.parse.urlencode(params)}"
 
     log.info(f"[TikTok OAuth] Redirecting to TikTok auth — state: {state}")
 
