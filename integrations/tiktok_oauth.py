@@ -27,7 +27,6 @@ SCOPES = [
     "user.info.basic",
     "video.upload",
     "video.publish",
-    "video.list",
 ]
 
 _state_store: dict = {}
