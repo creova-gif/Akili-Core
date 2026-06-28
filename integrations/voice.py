@@ -139,10 +139,73 @@ class VoiceEngine:
             log.error(f"TTS error: {e}")
             return None
 
+    # ── Long-form narration (full scripts) ────────────────────
+    async def synthesize_long(self, text: str) -> bytes | None:
+        """Narrate a full script: clean (no truncation), chunk, TTS each, stitch with ffmpeg."""
+        if not self.enabled or not text.strip():
+            return None
+        clean = self._clean_for_speech(text, max_chars=None)
+        chunks = self._chunk(clean, 3500)
+        parts: list[bytes] = []
+        for c in chunks:
+            audio = await (self._eleven_tts(c) if self.provider == "elevenlabs" else self._openai_tts(c))
+            if audio:
+                parts.append(audio)
+        if not parts:
+            return None
+        if len(parts) == 1:
+            return parts[0]
+        return await self._concat_mp3(parts)
+
+    @staticmethod
+    def _chunk(text: str, size: int) -> list[str]:
+        """Split on sentence boundaries into <=size pieces."""
+        import re as _re
+        sentences = _re.split(r"(?<=[.!?])\s+", text)
+        out, cur = [], ""
+        for s in sentences:
+            if len(cur) + len(s) + 1 > size and cur:
+                out.append(cur.strip()); cur = s
+            else:
+                cur = f"{cur} {s}".strip()
+        if cur:
+            out.append(cur.strip())
+        return out
+
+    async def _concat_mp3(self, parts: list[bytes]) -> bytes | None:
+        import os, tempfile, asyncio, shutil
+        ffmpeg = os.environ.get("FFMPEG_BIN", "ffmpeg")
+        if not shutil.which(ffmpeg):
+            return parts[0]  # no ffmpeg: return first chunk rather than nothing
+        d = tempfile.mkdtemp(prefix="akili_vo_")
+        try:
+            listf = os.path.join(d, "list.txt")
+            with open(listf, "w") as lf:
+                for i, p in enumerate(parts):
+                    fp = os.path.join(d, f"p{i}.mp3")
+                    with open(fp, "wb") as fh:
+                        fh.write(p)
+                    lf.write(f"file '{fp}'\n")
+            out = os.path.join(d, "out.mp3")
+            proc = await asyncio.create_subprocess_exec(
+                ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", listf, "-c", "copy", out,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+            if proc.returncode == 0 and os.path.exists(out):
+                with open(out, "rb") as fh:
+                    return fh.read()
+            return parts[0]
+        except Exception as e:
+            log.error(f"VO concat error: {e}")
+            return parts[0]
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
     # ── Helpers ───────────────────────────────────────────────
     @staticmethod
-    def _clean_for_speech(text: str, max_chars: int = 900) -> str:
-        """Strip emojis, dividers, markup so speech sounds natural and short."""
+    def _clean_for_speech(text: str, max_chars: int | None = 900) -> str:
+        """Strip emojis, dividers, markup so speech sounds natural. max_chars=None → no truncation."""
         t = text
         t = re.sub(r"[━─▸◦⚡📈🎯🧪🔊🛡📡📨🔍🎵🎧📊💾⚙️⚠️🟢🐙🔔🎙🗣🎬💰]+", " ", t)
         t = re.sub(r"[*_#~`>|]", "", t)
@@ -150,7 +213,7 @@ class VoiceEngine:
         t = re.sub(r"[①②③④⑤⑥⑦⑧⑨⑩]", "", t)
         t = re.sub(r"\n{2,}", ". ", t)
         t = re.sub(r"\s+", " ", t).strip()
-        if len(t) > max_chars:
+        if max_chars and len(t) > max_chars:
             cut = t[:max_chars]
             t = cut.rsplit(".", 1)[0] + "." if "." in cut else cut
         return t

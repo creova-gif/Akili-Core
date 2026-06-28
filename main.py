@@ -5,6 +5,7 @@
 # ============================================================
 
 import os
+import re
 import asyncio
 import logging
 from datetime import datetime
@@ -28,6 +29,7 @@ from agents.pulse import PulseAgent
 from agents.reach import ReachAgent
 from agents.intel import IntelAgent
 from agents.amplify import AmplifyAgent
+from agents.justtech import JustTechAgent
 from memory.manager import MemoryManager
 from integrations import IntegrationHub
 from integrations.tiktok_oauth import create_web_app
@@ -40,6 +42,9 @@ from scheduler.intel_live          import IntelLiveBrief
 
 # Phase 5 — Lead engine
 from integrations.intel_lead_engine import IntelLeadEngine
+
+# JustTech — faceless YouTube production + self-improvement loop
+from scheduler.justtech_optimizer import JustTechOptimizer
 
 # ── Logging ──────────────────────────────────────────────────
 os.makedirs("logs", exist_ok=True)
@@ -177,6 +182,7 @@ class AkiliCore:
         self.amplify = AmplifyAgent(ANTHROPIC_KEY, self.memory)
         self.hub     = IntegrationHub()
         self.voice   = VoiceEngine()          # Jarvis voice layer
+        self.justtech = JustTechAgent(ANTHROPIC_KEY, self.memory, self.voice)  # faceless YouTube
         self.identity = AKILI_IDENTITY
 
         # Phase 3 — set by init_phase3()
@@ -186,6 +192,7 @@ class AkiliCore:
 
         # Phase 5
         self.lead_engine = None
+        self.jt_optimizer = None              # JustTech weekly improvement loop
         self.bot = None
 
         log.info("AKILI CORE initialized — all 5 agents + integration hub loaded")
@@ -199,7 +206,8 @@ class AkiliCore:
                        or getattr(self.hub, "gmail", None)
         self.responder = ReachAutoResponder(telegram_app, gmail_client)
         self.lead_engine = IntelLeadEngine(telegram_app, self.memory)
-        log.info("Phase 3+5 modules initialized — PULSE Scheduler · REACH AutoResponder · INTEL LiveBrief · Lead Engine")
+        self.jt_optimizer = JustTechOptimizer(telegram_app, self.justtech)
+        log.info("Phase 3+5 modules initialized — PULSE Scheduler · REACH AutoResponder · INTEL LiveBrief · Lead Engine · JustTech Optimizer")
 
     async def route_command(self, text: str, chat_id: str) -> str:
         """Routes Justin's commands to the right agent."""
@@ -239,6 +247,24 @@ class AkiliCore:
             if text_lower.startswith(pfx):
                 song = text[len(pfx):].strip()
                 return await self.amplify.audio_only_campaign(song)
+
+        # ── JUSTTECH: faceless YouTube production + loops ──
+        if text_lower in ("/jt_topics", "youtube topics", "video ideas", "jt topics"):
+            return await self.justtech.suggest_topics(3)
+        if text_lower in ("/jt_retro", "youtube retro", "jt retro", "optimize youtube"):
+            return await self.justtech.retrospective()
+        if text_lower.startswith(("jt metrics", "/jt_metrics")):
+            nums = re.findall(r"[\d.]+", text)
+            if len(nums) >= 3:
+                ep_id, views, ret = int(float(nums[0])), int(float(nums[1])), float(nums[2])
+                ctr = float(nums[3]) if len(nums) >= 4 else 0.0
+                return await self.justtech.record_metrics(ep_id, views, ret, ctr)
+            return "Usage: jt metrics <episode#> <views> <retention%> [ctr%]"
+        for pfx in ("/justtech ", "justtech ", "youtube ", "/jt "):
+            if text_lower.startswith(pfx):
+                topic = text[len(pfx):].strip()
+                if topic:
+                    return await self.justtech.generate_episode(topic)
 
         # ── Phase 3: PULSE approval flow (POST / EDIT / SKIP) ─
         if self.scheduler and text.upper().startswith(("POST ", "EDIT ", "SKIP ")):
@@ -532,6 +558,13 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "▸ <code>/earnings</code> — data-driven music money strategy\n"
         "▸ <code>/campaign [song]</code> — audio-only promo plan\n\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
+        "🎬 <b>JustTech — Faceless YouTube (NEW)</b>\n"
+        "▸ <code>/jt [topic]</code> — full episode: script + scenes + thumbnail + metadata + Shorts + VO\n"
+        "▸ <code>/jt_topics</code> — fresh topic queue\n"
+        "▸ <code>/jt_retro</code> — run the self-improvement loop now\n"
+        "▸ <code>/jt_metrics [ep] [views] [ret%]</code> — feed results back in\n"
+        "<i>(auto-improves weekly: retrospective rewrites its own playbook)</i>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Deployed on Replit · St. Catharines, ON · creova.one</i>\n"
         "Send me anything, Justin.",
         parse_mode="HTML"
@@ -652,6 +685,64 @@ async def voice_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "Set with: <code>/voice on</code> · <code>/voice auto</code> · <code>/voice off</code>",
             parse_mode="HTML"
         )
+
+
+async def justtech_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """JustTech full production: generate episode package + narrate it (VO audio)."""
+    if str(update.effective_chat.id) != str(JUSTIN_CHAT_ID):
+        return
+    topic = " ".join(ctx.args).strip() if ctx.args else ""
+    if not topic:
+        await update.message.reply_text(
+            "🎬 <b>JustTech</b>\nUsage: <code>/jt &lt;topic&gt;</code>\n"
+            "e.g. <code>/jt how Figma reached a $20B valuation</code>\n\n"
+            "Other: <code>/jt_topics</code> · <code>/jt_retro</code> · "
+            "<code>/jt_metrics [ep] [views] [retention%]</code>",
+            parse_mode="HTML"
+        )
+        return
+    await update.message.reply_text("🎬 Writing the episode (research → script → scenes → metadata)…",
+                                    parse_mode="HTML")
+    try:
+        package = await akili.justtech.generate_episode(topic)
+        await _deliver(update, package, was_voice=False)
+        # Seamless: narrate the full script and send the VO.
+        if akili.justtech.last_script and akili.voice.enabled:
+            await update.message.reply_text("🎙 Narrating the script…", parse_mode="HTML")
+            audio = await akili.justtech.make_voiceover()
+            if audio:
+                from io import BytesIO
+                bio = BytesIO(audio); bio.name = "justtech_vo.mp3"
+                await update.message.reply_audio(audio=bio, title="JustTech VO")
+        await akili.memory.daily_log(f"JustTech episode produced: {topic[:50]}")
+    except Exception as e:
+        log.error(f"[JUSTTECH CMD ERROR] {e}")
+        await update.message.reply_text(f"⚠️ JustTech error: <code>{str(e)[:200]}</code>", parse_mode="HTML")
+
+
+async def jt_topics_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_chat.id) != str(JUSTIN_CHAT_ID):
+        return
+    await update.message.reply_text(await akili.justtech.suggest_topics(3))
+
+
+async def jt_retro_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_chat.id) != str(JUSTIN_CHAT_ID):
+        return
+    await update.message.reply_text("🔁 Running retrospective…", parse_mode="HTML")
+    await _deliver(update, await akili.justtech.retrospective(), was_voice=False)
+
+
+async def jt_metrics_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_chat.id) != str(JUSTIN_CHAT_ID):
+        return
+    nums = [float(n) for n in (ctx.args or []) if n.replace(".", "", 1).isdigit()]
+    if len(nums) >= 3:
+        ctr = nums[3] if len(nums) >= 4 else 0.0
+        await update.message.reply_text(
+            await akili.justtech.record_metrics(int(nums[0]), int(nums[1]), nums[2], ctr))
+    else:
+        await update.message.reply_text("Usage: /jt_metrics <episode#> <views> <retention%> [ctr%]")
 
 
 async def handle_music_file(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -795,6 +886,11 @@ async def main():
     app.add_handler(CommandHandler("pending", pending))
     app.add_handler(CommandHandler("drafts", pending)) # Just routes to pending or we can rely on handle_message
     app.add_handler(CommandHandler("voice", voice_cmd))   # Jarvis voice toggle
+    app.add_handler(CommandHandler("jt", justtech_cmd))           # JustTech: produce episode + VO
+    app.add_handler(CommandHandler("justtech", justtech_cmd))
+    app.add_handler(CommandHandler("jt_topics", jt_topics_cmd))
+    app.add_handler(CommandHandler("jt_retro", jt_retro_cmd))     # run learning loop now
+    app.add_handler(CommandHandler("jt_metrics", jt_metrics_cmd)) # feed performance back in
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))        # Jarvis voice in (voice notes)
     app.add_handler(MessageHandler(filters.AUDIO, handle_music_file))   # AMPLIFY: music file → visualizer
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -820,6 +916,9 @@ async def main():
         asyncio.create_task(akili.scheduler.run())
         asyncio.create_task(akili.live_intel.run())
         asyncio.create_task(akili.responder.run())
+
+        # JustTech weekly improvement loop
+        asyncio.create_task(akili.jt_optimizer.run())
 
         # Keep running until interrupted
         stop = asyncio.Event()
