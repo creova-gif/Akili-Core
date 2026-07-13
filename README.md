@@ -57,8 +57,8 @@ This repo went through a security hardening pass:
 ### Installation
 
 ```bash
-git clone https://github.com/creova-gif/Akili-Core.git
-cd Akili-Core
+git clone https://github.com/creova-gif/akili-core.git
+cd akili-core
 pip install -r requirements.txt
 cp .env.example .env
 # fill in your own keys in .env — this file is git-ignored
